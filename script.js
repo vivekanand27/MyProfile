@@ -206,6 +206,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add loading animation
     window.addEventListener('load', function() {
         document.body.classList.add('loaded');
+        // Visitor counter using CountAPI
+        const counterEl = document.getElementById('visitorCount');
+        if (counterEl) {
+            const namespace = 'vivekanand27.github.io';
+            const key = 'MyProfile_visitors';
+            fetch(`https://api.countapi.xyz/hit/${namespace}/${key}`)
+                .then(r => r.json())
+                .then(d => {
+                    if (typeof d.value !== 'undefined') {
+                        counterEl.textContent = d.value.toLocaleString();
+                    }
+                })
+                .catch(() => {
+                    // Fallback per-browser counter so UI stays friendly
+                    const localKey = 'localVisitorCount';
+                    const count = (parseInt(localStorage.getItem(localKey) || '0', 10) + 1);
+                    localStorage.setItem(localKey, String(count));
+                    counterEl.textContent = count.toLocaleString();
+                });
+        }
     });
 });
 
