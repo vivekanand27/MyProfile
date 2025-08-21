@@ -206,12 +206,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add loading animation
     window.addEventListener('load', function() {
         document.body.classList.add('loaded');
-        // Visitor counter using CountAPI
+        // Visitor counter using CountAPI - hit at most once per browser per 24h
         const counterEl = document.getElementById('visitorCount');
         if (counterEl) {
             const namespace = 'vivekanand27.github.io';
             const key = 'MyProfile_visitors';
-            fetch(`https://api.countapi.xyz/hit/${namespace}/${key}`)
+            const lastHitKey = 'visitor_last_hit';
+            const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+            // Always display current value first
+            fetch(`https://api.countapi.xyz/get/${namespace}/${key}`)
                 .then(r => r.json())
                 .then(d => {
                     if (typeof d.value !== 'undefined') {
@@ -219,12 +223,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 })
                 .catch(() => {
-                    // Fallback per-browser counter so UI stays friendly
-                    const localKey = 'localVisitorCount';
-                    const count = (parseInt(localStorage.getItem(localKey) || '0', 10) + 1);
-                    localStorage.setItem(localKey, String(count));
-                    counterEl.textContent = count.toLocaleString();
+                    // Silent: UI will update after optional hit below
                 });
+
+            // Increment at most once per 24 hours (per browser)
+            const lastHit = parseInt(localStorage.getItem(lastHitKey) || '0', 10);
+            const now = Date.now();
+            if (!Number.isFinite(lastHit) || now - lastHit >= ONE_DAY_MS) {
+                fetch(`https://api.countapi.xyz/hit/${namespace}/${key}`)
+                    .then(r => r.json())
+                    .then(d => {
+                        if (typeof d.value !== 'undefined') {
+                            counterEl.textContent = d.value.toLocaleString();
+                        }
+                        localStorage.setItem(lastHitKey, String(now));
+                    })
+                    .catch(() => {
+                        // Ignore network errors; counter will update next visit
+                    });
+            }
         }
     });
 });
