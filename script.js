@@ -206,42 +206,52 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add loading animation
     window.addEventListener('load', function() {
         document.body.classList.add('loaded');
-        // Visitor counter using CountAPI - hit at most once per browser per 24h
+        // Visitor counter: try CountAPI first; if unreachable, fall back to image badge
         const counterEl = document.getElementById('visitorCount');
         if (counterEl) {
             const namespace = 'vivekanand27.github.io';
             const key = 'MyProfile_visitors';
             const lastHitKey = 'visitor_last_hit';
             const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+            let updatedViaCountAPI = false;
 
-            // Always display current value first
+            function useImageCounterFallback() {
+                const encodedUrl = encodeURIComponent(window.location.origin + window.location.pathname);
+                const img = document.createElement('img');
+                img.src = `https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=${encodedUrl}&count_bg=%232563EB&title_bg=%232563EB&title=&edge_flat=false`;
+                img.alt = 'visitors';
+                img.style.verticalAlign = 'middle';
+                img.style.height = '20px';
+                counterEl.innerHTML = '';
+                counterEl.appendChild(img);
+            }
+
+            function safeSet(value) {
+                updatedViaCountAPI = true;
+                counterEl.textContent = Number(value).toLocaleString();
+            }
+
+            // Read current value
             fetch(`https://api.countapi.xyz/get/${namespace}/${key}`)
-                .then(r => r.json())
-                .then(d => {
-                    if (typeof d.value !== 'undefined') {
-                        counterEl.textContent = d.value.toLocaleString();
-                    }
-                })
-                .catch(() => {
-                    // Silent: UI will update after optional hit below
-                });
+                .then(r => r.ok ? r.json() : Promise.reject(r))
+                .then(d => { if (typeof d.value !== 'undefined') { safeSet(d.value); } })
+                .catch(() => {});
 
             // Increment at most once per 24 hours (per browser)
             const lastHit = parseInt(localStorage.getItem(lastHitKey) || '0', 10);
             const now = Date.now();
             if (!Number.isFinite(lastHit) || now - lastHit >= ONE_DAY_MS) {
                 fetch(`https://api.countapi.xyz/hit/${namespace}/${key}`)
-                    .then(r => r.json())
+                    .then(r => r.ok ? r.json() : Promise.reject(r))
                     .then(d => {
-                        if (typeof d.value !== 'undefined') {
-                            counterEl.textContent = d.value.toLocaleString();
-                        }
+                        if (typeof d.value !== 'undefined') { safeSet(d.value); }
                         localStorage.setItem(lastHitKey, String(now));
                     })
-                    .catch(() => {
-                        // Ignore network errors; counter will update next visit
-                    });
+                    .catch(() => {});
             }
+
+            // If CountAPI didn't update in time, show fallback badge
+            setTimeout(() => { if (!updatedViaCountAPI) { useImageCounterFallback(); } }, 2500);
         }
     });
 });
